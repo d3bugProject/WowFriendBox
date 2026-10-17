@@ -1,0 +1,88 @@
+{
+  "hotkeys": {
+    "toggle_broadcast": "ScrollLock",
+    "toggle_mouse_broadcast": "Pause",
+    "reapply_layout": "Home",
+    "slot_keys": [
+      "F1",
+      "F2",
+      "F3",
+      "F4",
+      "F5"
+    ]
+  },
+  "broadcast": {
+    "enabled_by_default": true,
+    "auto_chat_pause": true,
+    "whitelist": [
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "8",
+      "9",
+      "0",
+      "-",
+      "=",
+      "F",
+      "G",
+      "NumPad0",
+      "NumPad1",
+      "NumPad2",
+      "NumPad3",
+      "NumPad4",
+      "NumPad5",
+      "NumPad6",
+      "NumPad7",
+      "NumPad8",
+      "NumPad9"
+    ],
+    "blacklist": [
+      "Return",
+      "Space",
+      "Tab",
+      "Escape",
+      "W",
+      "A",
+      "S",
+      "D",
+      "Z",
+      "Q"
+    ],
+    "input_delay_ms": 0
+  },
+  "layout": {
+    "mode": "stacked",
+    "screen_resolution": [
+      1000,
+      563
+    ],
+    "center_window_size": [
+      1920,
+      1080
+    ],
+    "remove_borders": true,
+    "prevent_background_focus": false
+  },
+  "formation": {
+    "enabled": true,
+    "hotkey": "X",
+    "steps": [
+      { "slot": 2, "key": "Q", "duration_ms": 450 },
+      { "slot": 3, "key": "D", "duration_ms": 450 },
+      { "slot": 4, "key": "S", "duration_ms": 500 },
+      { "slot": 5, "key": "S", "duration_ms": 1200 }
+    ]
+  },
+  "click_to_heal": {
+    "enabled": false,
+    "healer_slot": 5,
+    "min_rx": 0.005,
+    "max_rx": 0.20,
+    "min_ry": 0.25,
+    "max_ry": 0.75
+  }
+}

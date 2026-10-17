@@ -1,0 +1,64 @@
+alors je pense quon va revoire notre facond e faire les chose 
+
+1- la version cli 
+une fenetre au depart avec des options 
+
+1- lancer un ecran 
+  ensuite deux choix 2560x1080 ou bien 1920x1080 les deux mode plein ecran avec modification au niveau de la config de wow pour changer la resolution 
+
+2- lancer plusieurs ecran 
+  ensuite deux choix 2560x1080 ou bien 1920x1080 les deux mode plein ecran avec modification au niveau de la config de wow pour changer la resolution
+  biensur ouvrire les 5 fenetre avec les comptees etc 
+  seul probleme ne pas les ouvrire tous dun coup ouvrire un et laisse 5s le temps decrire les credentials et de connecter ensuite lancer la deuxieme fenetre 
+
+3-ouvrire le fichier de configuration json pour le modifier 
+4- ouvrire le fichier de config pour le modifier 
+5- ouvrire le fichiers json des keybind pour les modifier 
+
+les keybind 
+pour swap fenetre ctrl+1 , ctrl 2 etc ...
+pour follow f1
+pour le unfollow + deploiment f2
+pour toggle full screen f3
+pour toggle fenetre f4  
+pour toggle barre de fenetre f5
+pour toggle bar des taches f6
+pour reload sur les 5 fenetre alt+r 
+garder le f,g pour linteraction avec pnj comme c ca marche 
+pour larret de lecoute de lapplication f10
+
+alors les touches qui doivent etre entendu 
+1,....0 
+alt 1.....alt0
+ctrl 1 .....ctrl 0 
+shift 1.....shift 0
+alt a ....z 
+
+2-partie graphique 
+faire toute la partie cli mais avec des boutons 
+meme les form json les mettre sous forme de formulaire au niveau de lapplication  sous forme de formulaire et de radio button 
+aussi pour les keybinds faire un formulaire avec des boutons pour chaque touche et un champ pour entrer la touche de remplacement biensur verifier les 
+je voudrais que la partie graphique soi faite de tel sorte a ce quil ny ai pas 1 milion de json mais pluto un json config.json avec tout dedan 
+aussi je voudrais que quand le exe se lance le cli ne soi pas apparent c a dire on ouvre pas 30 fenetre juste une seul 
+un dossier config avec tout dedan les graphique des boutons etc le fond etc ... les mettre en jpg ou png avec transparence je modifierai apres 
+un grande fenetre 800x600px avec toutes les option classer par onglet
+
+
+3- addon 
+alors pour le addon je voudrais que dans le addon il y ai 
+une option pour rajouter les membre du groupe automatiquement 
+aussi il faudrait que le add ons indique quel membre du groupe est connecter et synchro ou pas avec un petit voyant 
+es ce que c possible de custumiser le addon graphiquement 
+je vodurais que tu me donne les etapes pour le custumiser graphiquement quel matiere tu as besoin etc ... 
+je voudrais cree un addon asser developper le nommer eazybox 
+pour linstant il comportera deux volet la gestion des questes et du groupe et aussi linterface de heal ajouter un bouton option dans linterface heal pour au click ouvrire une fenetre 
+un espece de fiormulaire pour y mettre les nom des memebre 
+aussi les memebre doivent accepter automatiquement les invitation venant de laddon et le groupe doit etre synchroniser avec laddon pour savoir qui est connecter ou pas
+un autre volet sera une mini carte resizable il faut afficher la position des differntes danrees les mines dispo les herbes etc ...
+lobjectif c davoir des voyans lumineux sur un mini carte pour savoir si les ressources sont dispo ou pas soit utiliser les data de laddon carbonite ou dune autre base de donnees 
+donc trouver sur internet les emplacement des ressouyrces sur les carte 
+et puis dans la carte par defaut il ya genre un point jaune qui silumine quand ya une ressource dispo et qui s'eteint quand ya plus rien et bien je veu une minicarte qui affiche les potentiel ressource et qui clignote quand la ressources est disponible 
+une carte que je peu zoomer et dezoomer 
+ya un addon carbonite qui fait deja ca regarde comment il fonctionne et utilise ses carte si il le faut il faut que ca soit fluide et que ca ne lag pas le jeu
+
+

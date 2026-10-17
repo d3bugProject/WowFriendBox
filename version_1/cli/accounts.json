@@ -1,0 +1,42 @@
+{
+  "wow_path": "C:\\Users\\mnagency\\Desktop\\World of Warcraft 3.3.5a\\Wow.exe",
+  "launch_delay_ms": 1200,
+  "auto_login": true,
+  "accounts": [
+    {
+      "slot": 1,
+      "name": "Main Tank (Center)",
+      "account_name": "mel7",
+      "password": "fati2026",
+      "character": ""
+    },
+    {
+      "slot": 2,
+      "name": "Clone 1 (Top-Left)",
+      "account_name": "goldrogerz",
+      "password": "fati2026",
+      "character": ""
+    },
+    {
+      "slot": 3,
+      "name": "Clone 2 (Bottom-Left)",
+      "account_name": "elewel",
+      "password": "fati2026",
+      "character": ""
+    },
+    {
+      "slot": 4,
+      "name": "Clone 3 (Top-Right)",
+      "account_name": "ezawedj",
+      "password": "fati2026",
+      "character": ""
+    },
+    {
+      "slot": 5,
+      "name": "Clone 4 (Bottom-Right)",
+      "account_name": "etalet",
+      "password": "fati2026",
+      "character": ""
+    }
+  ]
+}

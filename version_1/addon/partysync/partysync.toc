@@ -1,0 +1,8 @@
+## Interface: 30300
+## Title: |cff00ddffPartySync|r (Warmane Multiboxing)
+## Notes: Gestionnaire de groupe ultra-rapide, auto-quetes et synchronisation pour multiboxing 3.3.5a
+## Author: WowFriendBox
+## Version: 1.0.0
+## SavedVariables: PartySyncDB
+
+partysync.lua
