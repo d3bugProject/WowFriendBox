@@ -1,13 +1,14 @@
-use windows::core::{BOOL, PCWSTR};
-use windows::Win32::Foundation::{HWND, LPARAM};
+use windows::core::{w, BOOL, PCWSTR};
+use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
 use windows::Win32::System::Threading::GetCurrentThreadId;
+use windows::Win32::UI::Input::KeyboardAndMouse::{MapVirtualKeyW, MAPVK_VK_TO_VSC, VK_F1, VK_RETURN};
 use windows::Win32::UI::WindowsAndMessaging::{
-    BringWindowToTop, EnumWindows, GetClassNameW, GetForegroundWindow,
+    BringWindowToTop, EnumWindows, FindWindowW, GetClassNameW, GetForegroundWindow,
     GetWindowLongPtrW, GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId,
-    IsWindowVisible, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, SetWindowTextW,
+    IsWindowVisible, PostMessageW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, SetWindowTextW,
     ShowWindow, GWL_STYLE, HWND_TOP, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE,
-    SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW, SW_SHOW, WS_CAPTION, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP,
-    WS_SYSMENU, WS_THICKFRAME, WS_VISIBLE,
+    SWP_NOSIZE, SWP_NOZORDER, SWP_SHOWWINDOW, SW_HIDE, SW_SHOW, WS_CAPTION, WS_MAXIMIZEBOX, WS_MINIMIZEBOX, WS_POPUP,
+    WS_SYSMENU, WS_THICKFRAME, WS_VISIBLE, WM_CHAR, WM_KEYDOWN, WM_KEYUP,
 };
 
 #[link(name = "user32")]
@@ -310,7 +311,171 @@ impl WindowManager {
             }
         }
     }
+
+    /// Toggles the Windows Taskbar on/off (F6)
+    pub fn toggle_taskbar(&self) {
+        unsafe {
+            if let Ok(tray) = FindWindowW(w!("Shell_TrayWnd"), None) {
+                if !tray.is_invalid() {
+                    let vis = IsWindowVisible(tray).as_bool();
+                    let _ = ShowWindow(tray, if vis { SW_HIDE } else { SW_SHOW });
+                    crate::logger::log_event(format!(
+                        "[TASKBAR] Barre des taches Windows : {}",
+                        if vis { "MASQUEE (Plein ecran immersif)" } else { "AFFICHEE" }
+                    ));
+                }
+            }
+            if let Ok(sec_tray) = FindWindowW(w!("Shell_SecondaryTrayWnd"), None) {
+                if !sec_tray.is_invalid() {
+                    let vis = IsWindowVisible(sec_tray).as_bool();
+                    let _ = ShowWindow(sec_tray, if vis { SW_HIDE } else { SW_SHOW });
+                }
+            }
+        }
+    }
+
+    /// Toggles Fullscreen Borderless mode on active window (F3)
+    pub fn toggle_fullscreen(&mut self, config: &LayoutConfig) {
+        if let Some(c) = self.clients.iter().find(|c| c.slot == self.active_slot) {
+            self.make_borderless(c.hwnd.0);
+            unsafe {
+                let _ = SetWindowPos(
+                    c.hwnd.0,
+                    Some(HWND_TOP),
+                    0,
+                    0,
+                    config.screen_resolution[0],
+                    config.screen_resolution[1],
+                    SWP_FRAMECHANGED | SWP_SHOWWINDOW,
+                );
+            }
+            crate::logger::log_event(format!(
+                "[FULLSCREEN] Slot {} passe en Plein Ecran ({}x{})",
+                self.active_slot, config.screen_resolution[0], config.screen_resolution[1]
+            ));
+        }
+    }
+
+    /// Toggles Windowed mode with standard window borders (F4)
+    pub fn toggle_windowed(&mut self, config: &LayoutConfig) {
+        if let Some(c) = self.clients.iter().find(|c| c.slot == self.active_slot) {
+            self.restore_borders(c.hwnd.0);
+            let w = (config.screen_resolution[0] - 120).max(800);
+            let h = (config.screen_resolution[1] - 120).max(600);
+            let x = (config.screen_resolution[0] - w) / 2;
+            let y = (config.screen_resolution[1] - h) / 2;
+            unsafe {
+                let _ = SetWindowPos(
+                    c.hwnd.0,
+                    Some(HWND_TOP),
+                    x,
+                    y,
+                    w,
+                    h,
+                    SWP_FRAMECHANGED | SWP_SHOWWINDOW,
+                );
+            }
+            crate::logger::log_event(format!(
+                "[WINDOWED] Slot {} passe en Mode Fenetre ({}x{})",
+                self.active_slot, w, h
+            ));
+        }
+    }
+
+    /// Restores standard window caption and resizable borders
+    pub fn restore_borders(&self, hwnd: HWND) {
+        unsafe {
+            let style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+            let border_styles = (WS_CAPTION.0 | WS_THICKFRAME.0 | WS_MINIMIZEBOX.0 | WS_MAXIMIZEBOX.0 | WS_SYSMENU.0) as isize;
+            let new_style = (style & !(WS_POPUP.0 as isize)) | border_styles;
+            let _ = SetWindowLongPtrW(hwnd, GWL_STYLE, new_style);
+            let _ = SetWindowPos(hwnd, None, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+        }
+    }
+
+    /// Toggles Window Title bar & borders (F5)
+    pub fn toggle_borders(&mut self) {
+        if let Some(c) = self.clients.iter().find(|c| c.slot == self.active_slot) {
+            unsafe {
+                let style = GetWindowLongPtrW(c.hwnd.0, GWL_STYLE);
+                let border_styles = (WS_CAPTION.0 | WS_THICKFRAME.0) as isize;
+                let has_borders = (style & border_styles) != 0;
+                if has_borders {
+                    let new_style = (style & !border_styles) | (WS_POPUP.0 | WS_VISIBLE.0) as isize;
+                    let _ = SetWindowLongPtrW(c.hwnd.0, GWL_STYLE, new_style);
+                    crate::logger::log_event(format!("[BORDERS] Slot {} : Bordures et titre retires", self.active_slot));
+                } else {
+                    let new_style = (style & !(WS_POPUP.0 as isize)) | border_styles;
+                    let _ = SetWindowLongPtrW(c.hwnd.0, GWL_STYLE, new_style);
+                    crate::logger::log_event(format!("[BORDERS] Slot {} : Bordures et titre restaures", self.active_slot));
+                }
+                let _ = SetWindowPos(
+                    c.hwnd.0,
+                    None,
+                    0,
+                    0,
+                    0,
+                    0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
+                );
+            }
+        }
+    }
+
+    /// Sends Follow command (F1) to all background windows (F1) with 70ms holding delay
+    pub fn follow_all(&self) {
+        crate::logger::log_event("[FOLLOW] Envoi de la touche F1 aux 4 clones...");
+        for c in &self.clients {
+            if c.slot != self.active_slot {
+                let hwnd_val = c.hwnd.as_isize();
+                std::thread::spawn(move || {
+                    let hwnd = windows::Win32::Foundation::HWND(hwnd_val as *mut core::ffi::c_void);
+                    let scan_code = unsafe { MapVirtualKeyW(VK_F1.0 as u32, MAPVK_VK_TO_VSC) };
+                    let lp_down: u32 = 1 | (scan_code << 16);
+                    let lp_up: u32 = 1 | (scan_code << 16) | (1 << 30) | (1 << 31);
+                    unsafe {
+                        let _ = PostMessageW(Some(hwnd), WM_KEYDOWN, WPARAM(VK_F1.0 as usize), LPARAM(lp_down as isize));
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(70));
+                    unsafe {
+                        let _ = PostMessageW(Some(hwnd), WM_KEYUP, WPARAM(VK_F1.0 as usize), LPARAM(lp_up as isize));
+                    }
+                });
+            }
+        }
+    }
+
+
+    /// Reloads WoW UI on all 5 windows simultaneously (Alt+R)
+    pub fn reload_all_ui(&self) {
+        crate::logger::log_event("[RELOAD] Rechargement de l'interface (/reload) sur les 5 fenetres WoW...");
+        for c in &self.clients {
+            send_slash_command(c.hwnd.0, "/reload");
+        }
+    }
 }
+
+/// Helper to send a chat command into a WoW window
+pub fn send_slash_command(hwnd: HWND, cmd: &str) {
+    unsafe {
+        // Press Enter to open chatbox
+        let _ = PostMessageW(Some(hwnd), WM_KEYDOWN, WPARAM(VK_RETURN.0 as usize), LPARAM(0));
+        let _ = PostMessageW(Some(hwnd), WM_KEYUP, WPARAM(VK_RETURN.0 as usize), LPARAM(0));
+        std::thread::sleep(std::time::Duration::from_millis(30));
+
+        // Type command
+        for ch in cmd.chars() {
+            let _ = PostMessageW(Some(hwnd), WM_CHAR, WPARAM(ch as usize), LPARAM(0));
+            std::thread::sleep(std::time::Duration::from_millis(15));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(30));
+
+        // Press Enter to send command
+        let _ = PostMessageW(Some(hwnd), WM_KEYDOWN, WPARAM(VK_RETURN.0 as usize), LPARAM(0));
+        let _ = PostMessageW(Some(hwnd), WM_KEYUP, WPARAM(VK_RETURN.0 as usize), LPARAM(0));
+    }
+}
+
 
 /// Forces Windows to transfer keyboard and mouse focus to the target window
 pub fn force_foreground_window(target_hwnd: HWND) {

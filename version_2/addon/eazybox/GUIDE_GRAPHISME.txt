@@ -1,0 +1,92 @@
+================================================================================
+                    GUIDE DE PERSONNALISATION GRAPHIQUE
+                     POUR L'ADDON EAZYBOX (WoW 3.3.5a)
+================================================================================
+
+Ce guide explique pas a pas comment personnaliser graphiquement l'addon EazyBox,
+quels formats d'images utiliser, les contraintes du moteur de World of Warcraft,
+et l'architecture des dossiers.
+
+--------------------------------------------------------------------------------
+1. REGLES ET FORMATS REQUIS PAR LE MOTEUR DE WOW 3.3.5a
+--------------------------------------------------------------------------------
+Le moteur graphique de World of Warcraft (DirectX 9 / 3.3.5a) impose des regles
+tres strictes pour charger des images personnalisees :
+
+A. Formats de fichiers acceptes :
+   1. Format .TGA (Targa) - RECOMMANDE POUR LA CREATION
+      - 32 bits non compresse (24 bits RVB + 8 bits canal Alpha pour la transparence).
+      - Pas de compression RLE.
+      - Origine de l'image : Coin inferieur gauche (Bottom-Left) par defaut.
+   2. Format .BLP (Blizzard Picture)
+      - Format proprietaire compresse (DXT1, DXT3, DXT5).
+      - Tres leger en memoire, mais necessite un convertisseur (ex: BLPConverter).
+
+B. La regle d'or des dimensions : LES PUISSANCES DE 2 (Power of Two)
+   La largeur et la hauteur de vos images DOIVENT obligatoirement etre des puissances de 2 :
+   - 16 x 16 px
+   - 32 x 32 px
+   - 64 x 64 px
+   - 128 x 128 px
+   - 256 x 256 px
+   - 512 x 512 px
+   (Exemple : 256x64, 512x256, 128x32 sont valides car les deux axes sont des puissances de 2).
+   ATTENTION : Une image en 100x50 ou 800x600 ne s'affichera PAS ou apparaîtra sous forme de carre vert bugge ("Green Texture").
+   Si votre bouton en jeu mesure 120x30, vous creez une image de 128x32 pixels, et le code Lua l'ajuste automatiquement !
+
+--------------------------------------------------------------------------------
+2. OUTILS GRATUITS CONSEILLES
+--------------------------------------------------------------------------------
+- GIMP (Gratuit & Open Source) :
+  Menu Fichier > Exporter sous > format .tga.
+  A l'export, DECOCHEZ "Compression RLE" et choisissez Origine "En bas a gauche".
+- Paint.NET (Gratuit) :
+  Supporte directement le .tga 32-bit avec transparence.
+- Adobe Photoshop :
+  Enregistrer sous > Targa (*.TGA) > 32 bits/pixel.
+- BLPConverter / BLP2PNG :
+  Pour convertir facilement entre PNG et BLP si vous preferez travailler en PNG.
+
+--------------------------------------------------------------------------------
+3. EMPLACEMENT DES ASSETS DANS L'ADDON
+--------------------------------------------------------------------------------
+Tous les fichiers graphiques doivent etre places dans le sous-dossier :
+Interface\AddOns\eazybox\textures\
+
+Structure recommandee des fichiers a fournir :
+
+  textures/
+  ├── bg_panel.tga          -> Fond des panneaux (ex: 256x256 px, texture metal ou sombre)
+  ├── border_frame.tga      -> Bordures decoratives (ex: 128x128 px)
+  ├── bar_status.tga        -> Texture des barres de vie/mana (ex: 128x32 px)
+  ├── dot_synced.tga        -> Voyant vert lumineux (ex: 32x32 px)
+  ├── dot_waiting.tga       -> Voyant jaune clignotant (ex: 32x32 px)
+  ├── dot_offline.tga       -> Voyant rouge eteint (ex: 32x32 px)
+  ├── radar_bg.tga          -> Fond de la mini-carte radar avec cercles (ex: 256x256 px)
+  ├── radar_pulse.tga       -> Anneau lumineux de detection d'objet (ex: 64x64 px)
+  ├── btn_normal.tga        -> Bouton etat repos (ex: 128x32 px)
+  ├── btn_hover.tga         -> Bouton etat survol (ex: 128x32 px)
+  └── btn_pushed.tga        -> Bouton etat clique (ex: 128x32 px)
+
+--------------------------------------------------------------------------------
+4. COMMENT LE CODE LUA UTILISE VOS IMAGES
+--------------------------------------------------------------------------------
+Dans les fichiers Lua (heal.lua, group.lua, map.lua), vos textures sont appliquees
+simplement avec cette fonction WoW :
+
+   monObjetTexture:SetTexture("Interface\\AddOns\\eazybox\\textures\\bg_panel.tga")
+
+Exemple pour une barre de vie personnalisee (heal.lua) :
+   bar:SetStatusBarTexture("Interface\\AddOns\\eazybox\\textures\\bar_status.tga")
+
+Exemple pour un voyant de synchronisation :
+   voyant:SetTexture("Interface\\AddOns\\eazybox\\textures\\dot_synced.tga")
+
+--------------------------------------------------------------------------------
+5. RESUME DE CE DONT VOUS AVEZ BESOIN POUR COMMENCER
+--------------------------------------------------------------------------------
+1. Creez vos images avec transparence (fond transparent pour les boutons arrondis ou ronds).
+2. Exportez-les en .tga 32 bits (ou .blp) avec des tailles en puissances de 2 (32x32, 64x64, 128x32, 256x256).
+3. Deposez-les dans `Interface/AddOns/eazybox/textures/`.
+4. Rechargez le jeu en faisant `/reload` (ou `Alt+R` avec WowFriendBox) pour admirer le rendu !
+================================================================================

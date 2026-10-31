@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use windows::core::BOOL;
 use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
 use windows::Win32::UI::Input::KeyboardAndMouse::{VK_BACK, VK_RETURN, VK_TAB};
+use std::io::Write;
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumWindows, GetClassNameW, GetWindowThreadProcessId, IsWindowVisible,
     PostMessageW, SetForegroundWindow, WM_CHAR, WM_KEYDOWN, WM_KEYUP,
@@ -39,7 +40,7 @@ pub struct AccountsConfig {
 }
 
 fn default_delay() -> u64 {
-    1200
+    5000
 }
 
 fn default_true() -> bool {
@@ -117,6 +118,123 @@ pub static LAUNCHED_PIDS: std::sync::LazyLock<RwLock<HashMap<u32, usize>>> =
     std::sync::LazyLock::new(|| RwLock::new(HashMap::new()));
 
 /// Launch all configured WoW accounts sequentially
+/// Update resolution and fullscreen settings in WoW's Config.wtf
+pub fn update_wow_config_wtf(wow_path: &str, width: i32, height: i32) -> Result<PathBuf, String> {
+    let exe_path = PathBuf::from(wow_path);
+    let parent = exe_path.parent().ok_or_else(|| "Chemin Wow.exe invalide".to_string())?;
+    let wtf_dir = parent.join("WTF");
+    if !wtf_dir.exists() {
+        let _ = fs::create_dir_all(&wtf_dir);
+    }
+    let config_wtf_path = wtf_dir.join("Config.wtf");
+
+    let mut lines: Vec<String> = Vec::new();
+    if config_wtf_path.exists() {
+        if let Ok(content) = fs::read_to_string(&config_wtf_path) {
+            lines = content.lines().map(|s| s.to_string()).collect();
+        }
+    }
+
+    let res_line = format!("SET gxResolution \"{}x{}\"", width, height);
+    let win_line = "SET gxWindow \"1\"".to_string();
+    let max_line = "SET gxMaximize \"1\"".to_string();
+
+    let mut has_res = false;
+    let mut has_win = false;
+    let mut has_max = false;
+
+    for line in &mut lines {
+        let trimmed = line.trim();
+        if trimmed.to_lowercase().starts_with("set gxresolution") {
+            *line = res_line.clone();
+            has_res = true;
+        } else if trimmed.to_lowercase().starts_with("set gxwindow") {
+            *line = win_line.clone();
+            has_win = true;
+        } else if trimmed.to_lowercase().starts_with("set gxmaximize") {
+            *line = max_line.clone();
+            has_max = true;
+        }
+    }
+
+    if !has_res { lines.push(res_line); }
+    if !has_win { lines.push(win_line); }
+    if !has_max { lines.push(max_line); }
+
+    let new_content = lines.join("\r\n") + "\r\n";
+    fs::write(&config_wtf_path, new_content).map_err(|e| format!("Erreur d'ecriture Config.wtf : {}", e))?;
+    log_event(format!("[CONFIG.WTF] Resolution mise a jour vers {}x{} (Plein ecran fenetre) dans {}", width, height, config_wtf_path.display()));
+    Ok(config_wtf_path)
+}
+
+/// Launch a single configured WoW account (e.g. Slot 1)
+pub fn launch_single_account(config: &AccountsConfig, target_slot: usize) {
+    let path = PathBuf::from(&config.wow_path);
+    if !path.exists() {
+        log_event(format!(
+            "[LAUNCHER ERROR] Wow.exe introuvable a l'emplacement : {}",
+            config.wow_path
+        ));
+        return;
+    }
+
+    let work_dir = path.parent().unwrap_or(Path::new("."));
+    let acc = config.accounts.iter().find(|a| a.slot == target_slot).cloned().unwrap_or_else(|| {
+        AccountEntry {
+            slot: target_slot,
+            name: format!("Slot {}", target_slot),
+            account_name: "".into(),
+            password: "".into(),
+            character: "".into(),
+        }
+    });
+
+    log_event(format!(
+        "[LAUNCHER] Lancement d'un ecran unique Slot {} ({}) -> Compte '{}'",
+        acc.slot, acc.name, acc.account_name
+    ));
+
+    match Command::new(&path).current_dir(work_dir).spawn() {
+        Ok(child) => {
+            let pid = child.id();
+            if let Ok(mut lock) = LAUNCHED_PIDS.write() {
+                lock.insert(pid, acc.slot);
+            }
+            log_event(format!("   -> Succes ! Processus PID {}", pid));
+
+            if config.auto_login && !acc.account_name.is_empty() {
+                let acc_clone = acc.clone();
+                thread::spawn(move || {
+                    let mut found: Option<HWND> = None;
+                    for _ in 0..50 {
+                        thread::sleep(Duration::from_millis(300));
+                        if let Some(h) = find_hwnd_for_pid(pid) {
+                            found = Some(h);
+                            break;
+                        }
+                    }
+
+                    if let Some(hwnd) = found {
+                        thread::sleep(Duration::from_millis(2500));
+                        log_event(format!(
+                            "[AUTO-LOGIN] Injection des identifiants pour Slot {} ({})",
+                            acc_clone.slot, acc_clone.account_name
+                        ));
+                        send_login_credentials(hwnd, &acc_clone.account_name, &acc_clone.password);
+                    }
+                });
+            }
+        }
+        Err(e) => {
+            log_event(format!(
+                "   -> ERREUR lors du lancement du Slot {} : {}",
+                acc.slot, e
+            ));
+        }
+    }
+}
+
+/// Launch all configured WoW accounts sequentially with 5-second connection delay
 pub fn launch_accounts(config: &AccountsConfig) {
     let path = PathBuf::from(&config.wow_path);
     if !path.exists() {
@@ -128,16 +246,17 @@ pub fn launch_accounts(config: &AccountsConfig) {
     }
 
     let work_dir = path.parent().unwrap_or(Path::new("."));
+    let total_accounts = config.accounts.len();
 
     log_event(format!(
-        "[LAUNCHER] Demarrage de {} compte(s) WoW...",
-        config.accounts.len()
+        "[LAUNCHER] Demarrage de {} comptes WoW avec 5s de delai entre chaque fenetre...",
+        total_accounts
     ));
 
-    for acc in &config.accounts {
+    for (idx, acc) in config.accounts.iter().enumerate() {
         log_event(format!(
-            "[LAUNCHER] Lancement Slot {} ({}) -> Compte '{}'",
-            acc.slot, acc.name, acc.account_name
+            "[LAUNCHER] Lancement ({}/{}) Slot {} ({}) -> Compte '{}'",
+            idx + 1, total_accounts, acc.slot, acc.name, acc.account_name
         ));
 
         match Command::new(&path).current_dir(work_dir).spawn() {
@@ -151,7 +270,6 @@ pub fn launch_accounts(config: &AccountsConfig) {
                 if config.auto_login && !acc.account_name.is_empty() {
                     let acc_clone = acc.clone();
                     thread::spawn(move || {
-                        // Wait for the window of this PID to be created
                         let mut found: Option<HWND> = None;
                         for _ in 0..50 {
                             thread::sleep(Duration::from_millis(300));
@@ -162,7 +280,6 @@ pub fn launch_accounts(config: &AccountsConfig) {
                         }
 
                         if let Some(hwnd) = found {
-                            // Give WoW ~2.5 seconds to finish loading its login screen
                             thread::sleep(Duration::from_millis(2500));
                             log_event(format!(
                                 "[AUTO-LOGIN] Injection des identifiants pour Slot {} ({})",
@@ -186,11 +303,21 @@ pub fn launch_accounts(config: &AccountsConfig) {
             }
         }
 
-        thread::sleep(Duration::from_millis(config.launch_delay_ms));
+        // If there are more accounts to launch, wait 5 seconds with countdown
+        if idx + 1 < total_accounts {
+            let delay_secs = (config.launch_delay_ms / 1000).max(1);
+            for s in (1..=delay_secs).rev() {
+                print!("\r[LAUNCHER] Attente de {}s (temps de connexion au compte) avant le compte suivant... ", s);
+                let _ = std::io::stdout().flush();
+                thread::sleep(Duration::from_secs(1));
+            }
+            println!();
+        }
     }
 
-    log_event("[LAUNCHER] Tous les processus ont ete lances ! Positionnement en cours...");
+    log_event("[LAUNCHER] Tous les comptes ont ete lances ! Positionnement en cours...");
 }
+
 
 /// Find HWND for a given Process ID
 pub fn find_hwnd_for_pid(target_pid: u32) -> Option<HWND> {

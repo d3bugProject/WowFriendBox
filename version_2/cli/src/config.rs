@@ -15,14 +15,55 @@ pub struct Config {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HotkeyConfig {
-    /// Key to toggle keyboard broadcasting on/off (e.g. "ScrollLock", "F12", "Tilde")
+    /// Key to toggle keyboard broadcasting on/off (default: "F10")
+    #[serde(default = "default_toggle_broadcast")]
     pub toggle_broadcast: String,
+    /// Key to trigger Follow on all background windows (default: "F1")
+    #[serde(default = "default_follow")]
+    pub follow: String,
+    /// Key to trigger Unfollow + Formation spread (default: "F2")
+    #[serde(default = "default_unfollow")]
+    pub unfollow_formation: String,
+    /// Key to toggle Fullscreen (default: "F3")
+    #[serde(default = "default_toggle_fullscreen")]
+    pub toggle_fullscreen: String,
+    /// Key to toggle Windowed mode (default: "F4")
+    #[serde(default = "default_toggle_windowed")]
+    pub toggle_windowed: String,
+    /// Key to toggle Window Title bar / borders (default: "F5")
+    #[serde(default = "default_toggle_borders")]
+    pub toggle_borders: String,
+    /// Key to toggle Windows Taskbar (default: "F6")
+    #[serde(default = "default_toggle_taskbar")]
+    pub toggle_taskbar: String,
+    /// Key combination to reload WoW UI on all 5 windows (default: "Alt+R")
+    #[serde(default = "default_reload_ui")]
+    pub reload_ui: String,
     /// Key to toggle mouse cursor broadcasting on/off (e.g. "Pause")
+    #[serde(default = "default_toggle_mouse")]
     pub toggle_mouse_broadcast: String,
     /// Key to re-align and reapply the window layout (e.g. "Home")
+    #[serde(default = "default_reapply_layout")]
     pub reapply_layout: String,
     /// Keys to swap active foreground window to Slot 1..5
+    #[serde(default = "default_slot_keys")]
     pub slot_keys: Vec<String>,
+}
+
+fn default_toggle_broadcast() -> String { "F10".to_string() }
+fn default_follow() -> String { "F1".to_string() }
+fn default_unfollow() -> String { "F2".to_string() }
+fn default_toggle_fullscreen() -> String { "F3".to_string() }
+fn default_toggle_windowed() -> String { "F4".to_string() }
+fn default_toggle_borders() -> String { "F5".to_string() }
+fn default_toggle_taskbar() -> String { "F6".to_string() }
+fn default_reload_ui() -> String { "Alt+R".to_string() }
+fn default_toggle_mouse() -> String { "Pause".to_string() }
+fn default_reapply_layout() -> String { "Home".to_string() }
+fn default_slot_keys() -> Vec<String> {
+    vec![
+        "Ctrl+1".into(), "Ctrl+2".into(), "Ctrl+3".into(), "Ctrl+4".into(), "Ctrl+5".into(),
+    ]
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -147,19 +188,25 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             hotkeys: HotkeyConfig {
-                toggle_broadcast: "ScrollLock".into(),
-                toggle_mouse_broadcast: "Pause".into(),
-                reapply_layout: "Home".into(),
-                slot_keys: vec![
-                    "F1".into(), "F2".into(), "F3".into(), "F4".into(), "F5".into(),
-                ],
+                toggle_broadcast: default_toggle_broadcast(),
+                follow: default_follow(),
+                unfollow_formation: default_unfollow(),
+                toggle_fullscreen: default_toggle_fullscreen(),
+                toggle_windowed: default_toggle_windowed(),
+                toggle_borders: default_toggle_borders(),
+                toggle_taskbar: default_toggle_taskbar(),
+                reload_ui: default_reload_ui(),
+                toggle_mouse_broadcast: default_toggle_mouse(),
+                reapply_layout: default_reapply_layout(),
+                slot_keys: default_slot_keys(),
             },
             broadcast: BroadcastConfig {
-                enabled_by_default: false,
+                enabled_by_default: true,
                 auto_chat_pause: true,
                 whitelist: vec![
                     "1".into(), "2".into(), "3".into(), "4".into(), "5".into(),
                     "6".into(), "7".into(), "8".into(), "9".into(), "0".into(),
+                    "F".into(), "G".into(),
                     "-".into(), "=".into(),
                     "NumPad0".into(), "NumPad1".into(), "NumPad2".into(),
                     "NumPad3".into(), "NumPad4".into(), "NumPad5".into(),
@@ -177,7 +224,7 @@ impl Default for Config {
                 mode: "stacked".into(),
                 screen_resolution: [1920, 1080],
                 center_window_size: [1920, 1080],
-                remove_borders: false,
+                remove_borders: true,
                 prevent_background_focus: false,
             },
             formation: FormationConfig::default(),
@@ -187,6 +234,11 @@ impl Default for Config {
 }
 
 impl Config {
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<(), String> {
+        let json_str = serde_json::to_string_pretty(self).map_err(|e| e.to_string())?;
+        fs::write(path, json_str).map_err(|e| e.to_string())
+    }
+
     pub fn load_or_create<P: AsRef<Path>>(path: P) -> Self {
         let p = path.as_ref();
         if p.exists() {
@@ -209,3 +261,4 @@ impl Config {
         default_cfg
     }
 }
+

@@ -4,11 +4,11 @@ use std::sync::{Mutex, RwLock};
 
 use windows::Win32::Foundation::{LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    MapVirtualKeyW, MAPVK_VK_TO_VSC, VK_0, VK_1, VK_2, VK_3, VK_4, VK_5, VK_6,
-    VK_7, VK_8, VK_9, VK_A, VK_D, VK_ESCAPE, VK_F1, VK_F10, VK_F11, VK_F12,
-    VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_HOME, VK_NUMPAD0,
+    GetAsyncKeyState, MapVirtualKeyW, MAPVK_VK_TO_VSC, VK_0, VK_1, VK_2, VK_3, VK_4, VK_5, VK_6,
+    VK_7, VK_8, VK_9, VK_A, VK_CONTROL, VK_D, VK_ESCAPE, VK_F, VK_F1, VK_F10, VK_F11, VK_F12,
+    VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_G, VK_HOME, VK_MENU, VK_NUMPAD0,
     VK_NUMPAD1, VK_NUMPAD2, VK_NUMPAD3, VK_NUMPAD4, VK_NUMPAD5, VK_NUMPAD6, VK_NUMPAD7,
-    VK_NUMPAD8, VK_NUMPAD9, VK_PAUSE, VK_Q, VK_RETURN, VK_S, VK_SCROLL, VK_SPACE,
+    VK_NUMPAD8, VK_NUMPAD9, VK_PAUSE, VK_Q, VK_R, VK_RETURN, VK_S, VK_SCROLL, VK_SHIFT, VK_SPACE,
     VK_TAB, VK_W, VK_Z,
 };
 use windows::Win32::Graphics::Gdi::ScreenToClient;
@@ -27,7 +27,15 @@ use crate::window::SafeHwnd;
 pub enum AppEvent {
     Swap(usize),
     ReapplyLayout,
+    Follow,
+    UnfollowFormation,
+    ToggleFullscreen,
+    ToggleWindowed,
+    ToggleBorders,
+    ToggleTaskbar,
+    ReloadAllUi,
 }
+
 
 // Lock-free shared state for Win32 hooks
 pub static BROADCAST_ENABLED: AtomicBool = AtomicBool::new(false);
@@ -288,19 +296,21 @@ unsafe extern "system" fn low_level_keyboard_proc(
             CHAT_MODE_ACTIVE.store(false, Ordering::Relaxed);
         }
 
+        let ctrl_down = (unsafe { GetAsyncKeyState(VK_CONTROL.0 as i32) } as u16 & 0x8000) != 0;
+        let alt_down = (unsafe { GetAsyncKeyState(VK_MENU.0 as i32) } as u16 & 0x8000) != 0;
+        let shift_down = (unsafe { GetAsyncKeyState(VK_SHIFT.0 as i32) } as u16 & 0x8000) != 0;
+
         if is_key_down {
             // Chat Auto-Pause: automatically suspend key broadcasting when typing in WoW chat
             if is_active_wow && AUTO_CHAT_PAUSE.load(Ordering::Relaxed) {
                 let in_chat = CHAT_MODE_ACTIVE.load(Ordering::Relaxed);
                 if !in_chat {
-                    // Enter (VK_RETURN = 13), Slash (191, 111)
                     if vk == VK_RETURN.0 || vk == 191 || vk == 111 {
                         CHAT_MODE_ACTIVE.store(true, Ordering::Relaxed);
                         crate::logger::log_event("[CHAT] Mode Discussion ACTIF -> Broadcast en pause pour ecrire");
                         return unsafe { CallNextHookEx(None, n_code, wparam, lparam) };
                     }
                 } else {
-                    // Enter (13 sends message), Escape (VK_ESCAPE = 27 cancels chat)
                     if vk == VK_RETURN.0 || vk == VK_ESCAPE.0 {
                         CHAT_MODE_ACTIVE.store(false, Ordering::Relaxed);
                         let reason = if vk == VK_RETURN.0 { "Message envoye" } else { "Chat annule" };
@@ -310,18 +320,109 @@ unsafe extern "system" fn low_level_keyboard_proc(
                 }
             }
 
-            let toggle_b = TOGGLE_BROADCAST_VK.load(Ordering::Relaxed) as u16;
-            if toggle_b != 0 && vk == toggle_b {
+            // 1. Swap fenetre : Ctrl+1 .. Ctrl+5 (mode.txt)
+            if ctrl_down && !alt_down {
+                let target_slot = match vk {
+                    v if v == VK_1.0 || v == VK_NUMPAD1.0 => Some(1),
+                    v if v == VK_2.0 || v == VK_NUMPAD2.0 => Some(2),
+                    v if v == VK_3.0 || v == VK_NUMPAD3.0 => Some(3),
+                    v if v == VK_4.0 || v == VK_NUMPAD4.0 => Some(4),
+                    v if v == VK_5.0 || v == VK_NUMPAD5.0 => Some(5),
+                    _ => None,
+                };
+                if let Some(slot) = target_slot {
+                    if let Ok(guard) = EVENT_SENDER.lock() {
+                        if let Some(sender) = guard.as_ref() {
+                            let _ = sender.send(AppEvent::Swap(slot));
+                        }
+                    }
+                    return LRESULT(1);
+                }
+            }
+
+            // 2. Follow : F1 (mode.txt)
+            if vk == VK_F1.0 && !ctrl_down && !alt_down && !shift_down {
+                if let Ok(guard) = EVENT_SENDER.lock() {
+                    if let Some(sender) = guard.as_ref() {
+                        let _ = sender.send(AppEvent::Follow);
+                    }
+                }
+                return LRESULT(1);
+            }
+
+            // 3. Unfollow + deploiment : F2 (mode.txt)
+            if vk == VK_F2.0 && !ctrl_down && !alt_down && !shift_down {
+                if let Ok(guard) = EVENT_SENDER.lock() {
+                    if let Some(sender) = guard.as_ref() {
+                        let _ = sender.send(AppEvent::UnfollowFormation);
+                    }
+                }
+                return LRESULT(1);
+            }
+
+            // 4. Toggle full screen : F3 (mode.txt)
+            if vk == VK_F3.0 && !ctrl_down && !alt_down && !shift_down {
+                if let Ok(guard) = EVENT_SENDER.lock() {
+                    if let Some(sender) = guard.as_ref() {
+                        let _ = sender.send(AppEvent::ToggleFullscreen);
+                    }
+                }
+                return LRESULT(1);
+            }
+
+            // 5. Toggle fenetre : F4 (mode.txt)
+            if vk == VK_F4.0 && !ctrl_down && !alt_down && !shift_down {
+                if let Ok(guard) = EVENT_SENDER.lock() {
+                    if let Some(sender) = guard.as_ref() {
+                        let _ = sender.send(AppEvent::ToggleWindowed);
+                    }
+                }
+                return LRESULT(1);
+            }
+
+            // 6. Toggle barre de fenetre : F5 (mode.txt)
+            if vk == VK_F5.0 && !ctrl_down && !alt_down && !shift_down {
+                if let Ok(guard) = EVENT_SENDER.lock() {
+                    if let Some(sender) = guard.as_ref() {
+                        let _ = sender.send(AppEvent::ToggleBorders);
+                    }
+                }
+                return LRESULT(1);
+            }
+
+            // 7. Toggle barre des taches : F6 (mode.txt)
+            if vk == VK_F6.0 && !ctrl_down && !alt_down && !shift_down {
+                if let Ok(guard) = EVENT_SENDER.lock() {
+                    if let Some(sender) = guard.as_ref() {
+                        let _ = sender.send(AppEvent::ToggleTaskbar);
+                    }
+                }
+                return LRESULT(1);
+            }
+
+            // 8. Reload sur les 5 fenetres : Alt+R (mode.txt)
+            if alt_down && (vk == VK_R.0 || vk == 82) {
+                if let Ok(guard) = EVENT_SENDER.lock() {
+                    if let Some(sender) = guard.as_ref() {
+                        let _ = sender.send(AppEvent::ReloadAllUi);
+                    }
+                }
+                return LRESULT(1);
+            }
+
+            // 9. Arret de l'ecoute de l'application : F10 (mode.txt)
+            if vk == VK_F10.0 {
                 let cur = BROADCAST_ENABLED.load(Ordering::Relaxed);
                 let new_val = !cur;
                 BROADCAST_ENABLED.store(new_val, Ordering::Relaxed);
                 crate::logger::log_event(format!(
                     "[ISBOXER-RS] Clavier Broadcast: {}",
-                    if new_val { "ACTIVE (ON)" } else { "DESACTIVE (OFF)" }
+                    if new_val { "ACTIVE (ON)" } else { "ARRETE / DESACTIVE (OFF)" }
                 ));
                 return LRESULT(1);
             }
 
+            // Toggle souris : Pause
             let toggle_m = TOGGLE_MOUSE_VK.load(Ordering::Relaxed) as u16;
             if toggle_m != 0 && vk == toggle_m {
                 let cur = MOUSE_BROADCAST_ENABLED.load(Ordering::Relaxed);
@@ -334,6 +435,7 @@ unsafe extern "system" fn low_level_keyboard_proc(
                 return LRESULT(1);
             }
 
+            // Reapply Layout : Home
             let reapply = REAPPLY_LAYOUT_VK.load(Ordering::Relaxed) as u16;
             if reapply != 0 && vk == reapply {
                 if let Ok(guard) = EVENT_SENDER.lock() {
@@ -343,28 +445,6 @@ unsafe extern "system" fn low_level_keyboard_proc(
                 }
                 return LRESULT(1);
             }
-
-            // Formation / Combat Spread Hotkey
-            let form_vk = FORMATION_HOTKEY_VK.load(Ordering::Relaxed) as u16;
-            if form_vk != 0 && vk == form_vk && FORMATION_ENABLED.load(Ordering::Relaxed) {
-                if is_active_wow {
-                    execute_formation();
-                    return LRESULT(1);
-                }
-            }
-
-            if let Ok(slots) = SLOT_VKS.read() {
-                for (i, &slot_vk) in slots.iter().enumerate() {
-                    if vk == slot_vk {
-                        if let Ok(guard) = EVENT_SENDER.lock() {
-                            if let Some(sender) = guard.as_ref() {
-                                let _ = sender.send(AppEvent::Swap(i + 1));
-                            }
-                        }
-                        return LRESULT(1);
-                    }
-                }
-            }
         }
 
         // Keyboard broadcasting (suppressed while typing in chat!)
@@ -373,35 +453,70 @@ unsafe extern "system" fn low_level_keyboard_proc(
             && (is_key_down || is_key_up)
         {
             if is_active_wow {
-                let is_whitelisted = if let Ok(wl) = WHITELIST_VKS.read() {
-                    wl.is_empty() || wl.contains(&vk)
-                } else {
+                // Touches qui doivent etre entendues (mode.txt) :
+                // 1..0, alt 1..alt0, ctrl 1..ctrl 0, shift 1..shift 0, alt a..z, f, g
+                let is_digit = (vk >= VK_0.0 && vk <= VK_9.0) || (vk >= VK_NUMPAD0.0 && vk <= VK_NUMPAD9.0);
+                let is_letter = vk >= VK_A.0 && vk <= VK_Z.0;
+                let is_pnj_interact = vk == VK_F.0 || vk == VK_G.0;
+                let is_symbol = vk == 189 || vk == 187; // '-' and '='
+
+                let should_broadcast = if is_digit {
+                    // Digits are broadcasted with normal, alt, ctrl, or shift!
                     true
-                };
-                let is_blacklisted = if let Ok(bl) = BLACKLIST_VKS.read() {
-                    bl.contains(&vk)
+                } else if is_letter {
+                    // Letters broadcasted if Alt held (Alt+A..Z) or if F/G (PNJ interaction)
+                    alt_down || is_pnj_interact
+                } else if is_symbol {
+                    true
                 } else {
                     false
                 };
 
-                if is_whitelisted && !is_blacklisted {
+                if should_broadcast {
                     let scan_code = unsafe { MapVirtualKeyW(vk as u32, MAPVK_VK_TO_VSC) };
                     let mut lp: u32 = 1 | (scan_code << 16);
+                    if alt_down {
+                        lp |= 1 << 29; // Context code: ALT is held
+                    }
                     if is_key_up {
                         lp |= (1 << 30) | (1 << 31);
                     }
-                    let msg = if is_key_down { WM_KEYDOWN } else { WM_KEYUP };
+                    let msg = if alt_down {
+                        if is_key_down { WM_SYSKEYDOWN } else { WM_SYSKEYUP }
+                    } else {
+                        if is_key_down { WM_KEYDOWN } else { WM_KEYUP }
+                    };
 
                     if let Ok(hwnds) = WOW_HWNDS.read() {
                         for hwnd in hwnds.iter() {
                             if hwnd.0 != fg_hwnd {
                                 unsafe {
+                                    if shift_down && is_key_down {
+                                        let _ = PostMessageW(Some(hwnd.0), WM_KEYDOWN, WPARAM(VK_SHIFT.0 as usize), LPARAM(0));
+                                    }
+                                    if ctrl_down && is_key_down {
+                                        let _ = PostMessageW(Some(hwnd.0), WM_KEYDOWN, WPARAM(VK_CONTROL.0 as usize), LPARAM(0));
+                                    }
+                                    if alt_down && is_key_down {
+                                        let _ = PostMessageW(Some(hwnd.0), WM_SYSKEYDOWN, WPARAM(VK_MENU.0 as usize), LPARAM(1 << 29));
+                                    }
+
                                     let _ = PostMessageW(
                                         Some(hwnd.0),
                                         msg,
                                         WPARAM(vk as usize),
                                         LPARAM(lp as isize),
                                     );
+
+                                    if alt_down && is_key_up {
+                                        let _ = PostMessageW(Some(hwnd.0), WM_SYSKEYUP, WPARAM(VK_MENU.0 as usize), LPARAM((1 << 29) | (1 << 30) | (1 << 31)));
+                                    }
+                                    if ctrl_down && is_key_up {
+                                        let _ = PostMessageW(Some(hwnd.0), WM_KEYUP, WPARAM(VK_CONTROL.0 as usize), LPARAM((1 << 30) | (1 << 31)));
+                                    }
+                                    if shift_down && is_key_up {
+                                        let _ = PostMessageW(Some(hwnd.0), WM_KEYUP, WPARAM(VK_SHIFT.0 as usize), LPARAM((1 << 30) | (1 << 31)));
+                                    }
                                 }
                             }
                         }
@@ -409,6 +524,7 @@ unsafe extern "system" fn low_level_keyboard_proc(
                 }
             }
         }
+
     }
 
     unsafe { CallNextHookEx(None, n_code, wparam, lparam) }

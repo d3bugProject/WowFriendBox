@@ -1,14 +1,21 @@
 {
   "hotkeys": {
-    "toggle_broadcast": "ScrollLock",
+    "toggle_broadcast": "F10",
+    "follow": "F1",
+    "unfollow_formation": "F2",
+    "toggle_fullscreen": "F3",
+    "toggle_windowed": "F4",
+    "toggle_borders": "F5",
+    "toggle_taskbar": "F6",
+    "reload_ui": "Alt+R",
     "toggle_mouse_broadcast": "Pause",
     "reapply_layout": "Home",
     "slot_keys": [
-      "F1",
-      "F2",
-      "F3",
-      "F4",
-      "F5"
+      "Ctrl+1",
+      "Ctrl+2",
+      "Ctrl+3",
+      "Ctrl+4",
+      "Ctrl+5"
     ]
   },
   "broadcast": {
@@ -25,10 +32,10 @@
       "8",
       "9",
       "0",
-      "-",
-      "=",
       "F",
       "G",
+      "-",
+      "=",
       "NumPad0",
       "NumPad1",
       "NumPad2",
@@ -57,11 +64,11 @@
   "layout": {
     "mode": "stacked",
     "screen_resolution": [
-      1000,
-      563
+      2560,
+      1080
     ],
     "center_window_size": [
-      1920,
+      2560,
       1080
     ],
     "remove_borders": true,
@@ -69,19 +76,35 @@
   },
   "formation": {
     "enabled": true,
-    "hotkey": "X",
+    "hotkey": "F2",
     "steps": [
-      { "slot": 2, "key": "Q", "duration_ms": 450 },
-      { "slot": 3, "key": "D", "duration_ms": 450 },
-      { "slot": 4, "key": "S", "duration_ms": 500 },
-      { "slot": 5, "key": "S", "duration_ms": 1200 }
+      {
+        "slot": 2,
+        "key": "Q",
+        "duration_ms": 450
+      },
+      {
+        "slot": 3,
+        "key": "D",
+        "duration_ms": 450
+      },
+      {
+        "slot": 4,
+        "key": "S",
+        "duration_ms": 500
+      },
+      {
+        "slot": 5,
+        "key": "S",
+        "duration_ms": 1200
+      }
     ]
   },
   "click_to_heal": {
     "enabled": false,
     "healer_slot": 5,
     "min_rx": 0.005,
-    "max_rx": 0.20,
+    "max_rx": 0.2,
     "min_ry": 0.25,
     "max_ry": 0.75
   }

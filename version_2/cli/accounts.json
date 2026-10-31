@@ -1,6 +1,6 @@
 {
   "wow_path": "C:\\Users\\mnagency\\Desktop\\World of Warcraft 3.3.5a\\Wow.exe",
-  "launch_delay_ms": 1200,
+  "launch_delay_ms": 5000,
   "auto_login": true,
   "accounts": [
     {

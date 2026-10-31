@@ -1,0 +1,13 @@
+## Interface: 30300
+## Title: |cff00ddffEazyBox|r (Multibox Manager)
+## Notes: Gestion de groupe, Auto-Follow F1, Auto-Quetes, Grille de soins et Radar de ressources (WotLK 3.3.5a)
+## Author: WowFriendBox
+## Version: 2.0.0
+## SavedVariables: EazyBoxDB
+
+database.lua
+core.lua
+group.lua
+quests.lua
+heal.lua
+map.lua
